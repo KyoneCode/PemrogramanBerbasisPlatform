@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "323337314428",
+    "project_id": "tugas2pbp",
+    "storage_bucket": "tugas2pbp.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:323337314428:android:96f07d31dff5318798e9f9",
+        "android_client_info": {
+          "package_name": "com.Tiodips.firebase"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAfSYWD8Ehiz8y88o9nRVSB9GQCVm2z4O0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
