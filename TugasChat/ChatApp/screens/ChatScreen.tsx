@@ -6,6 +6,9 @@ import {
     Button,
     FlatList,
     StyleSheet,
+    Alert,
+    TouchableOpacity,
+    SafeAreaView,
 } from "react-native";
 import {
     addDoc,
@@ -17,6 +20,9 @@ import {
 import { messagesCollection } from "../firebase";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../App";
+import { signOut } from "firebase/auth";
+import { auth } from "../firebase";
+
 type MessageType = {
     id: string;
     text: string;
@@ -25,8 +31,8 @@ type MessageType = {
 };
 type Props = NativeStackScreenProps<RootStackParamList,
 "Chat">;
-export default function ChatScreen({ route }: Props) {
-    const { name } = route.params;
+const ChatScreen = ({ route }: Props) => {
+  const { name } = route.params;
     const [message, setMessage] = useState<string>("");
     const [messages, setMessages] = useState<MessageType[]>([]);
 
@@ -66,9 +72,41 @@ useEffect(() => {
     </View>
     );
 
+  const handleLogout = () => {
+    Alert.alert(
+      "Logout",
+      "Apakah Anda yakin ingin keluar?",
+      [
+        {
+          text: "Batal",
+          style: "cancel",
+        },
+        {
+          text: "Keluar",
+          onPress: async () => {
+            try {
+              await signOut(auth);
+            } catch (error) {
+              Alert.alert("Error", "Gagal logout");
+            }
+          },
+          style: "destructive",
+        },
+      ]
+    );
+  };
+
     return (
-    <View style={{ flex: 1 }}>
-    <FlatList
+    <SafeAreaView style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Chat Room</Text>
+        <Text style={styles.headerSubtitle}>Welcome, {name}</Text>
+        <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
+          <Text style={styles.logoutText}>Logout</Text>
+        </TouchableOpacity>
+      </View>
+      
+      <FlatList
     data={messages}
     keyExtractor={(item) => item.id}
     renderItem={renderItem}
@@ -83,11 +121,15 @@ useEffect(() => {
     />
     <Button title="Kirim" onPress={sendMessage} />
     </View>
-    </View>
+    </SafeAreaView>
     );
 }
 
 const styles = StyleSheet.create({
+    container: {
+        flex: 1,
+        backgroundColor: "#fff",
+    },
     msgBox: {
     padding: 10,
     marginVertical: 6,
@@ -119,4 +161,35 @@ const styles = StyleSheet.create({
     padding: 8,
     borderRadius: 6,
     },
+    header: {
+    padding: 15,
+    backgroundColor: "#007AFF",
+    borderBottomWidth: 1,
+    borderBottomColor: "#ddd",
+  },
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: "bold",
+    color: "#fff",
+  },
+  headerSubtitle: {
+    fontSize: 14,
+    color: "#fff",
+    marginTop: 5,
+  },
+  logoutButton: {
+    position: "absolute",
+    right: 15,
+    top: 15,
+    backgroundColor: "#fff",
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    borderRadius: 5,
+  },
+  logoutText: {
+    color: "#007AFF",
+    fontWeight: "600",
+  },
 });
+
+export default ChatScreen;

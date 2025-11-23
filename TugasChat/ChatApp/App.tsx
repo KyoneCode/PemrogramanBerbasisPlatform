@@ -1,33 +1,58 @@
 import React, { useEffect, useState } from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import { onAuthStateChanged } from "firebase/auth";
+import { auth } from "./firebase";
 import LoginScreen from "./screens/LoginScreen";
+import RegisterScreen from "./screens/RegisterScreen";
 import ChatScreen from "./screens/ChatScreen";
-import { auth, signInAnonymously, onAuthStateChanged } from "./firebase";
-import { User } from "firebase/auth";
-export type RootStackParamList = {
-Login: undefined;
-Chat: { name: string };
-};
 
-const Stack = createNativeStackNavigator<RootStackParamList>();
-export default function App() {
-const [user, setUser] = useState<User | null>(null);
-useEffect(() => 
-    { signInAnonymously(auth).catch(console.error);
-    const unsub = onAuthStateChanged(auth, (u) => { setUser(u);});
-    return () => unsub();
-    }, []);
-if (!user) return null;
+const Stack = createNativeStackNavigator();
 
-return (
+function App() {
+  const [user, setUser] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      setLoading(false);
+    });
+
+    return unsubscribe;
+  }, []);
+
+  if (loading) {
+    return null;
+  }
+
+  return (
     <NavigationContainer>
-    <Stack.Navigator>
-    <Stack.Screen name="Login"
-    component={LoginScreen} />
-    <Stack.Screen name="Chat"
-    component={ChatScreen} />
-    </Stack.Navigator>
+      <Stack.Navigator>
+        {user ? (
+          <Stack.Screen
+            name="Chat"
+            component={ChatScreen}
+            initialParams={{ name: user.displayName || user.email }}
+            options={{ headerShown: false }}
+          />
+        ) : (
+          <>
+            <Stack.Screen
+              name="Login"
+              component={LoginScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="Register"
+              component={RegisterScreen}
+              options={{ headerShown: false }}
+            />
+          </>
+        )}
+      </Stack.Navigator>
     </NavigationContainer>
-);
+  );
 }
+
+export default App;
