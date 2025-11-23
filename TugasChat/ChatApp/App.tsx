@@ -7,13 +7,20 @@ import LoginScreen from "./screens/LoginScreen";
 import RegisterScreen from "./screens/RegisterScreen";
 import ChatScreen from "./screens/ChatScreen";
 
-const Stack = createNativeStackNavigator();
+export type RootStackParamList = {
+  Login: undefined;
+  Register: undefined;
+  Chat: { name: string };
+};
+
+const Stack = createNativeStackNavigator<RootStackParamList>();
 
 function App() {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Listen auth state changes saja
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
       setLoading(false);
@@ -33,7 +40,7 @@ function App() {
           <Stack.Screen
             name="Chat"
             component={ChatScreen}
-            initialParams={{ name: user.displayName || user.email }}
+            initialParams={{ name: user.displayName || user.email || "User" }}
             options={{ headerShown: false }}
           />
         ) : (

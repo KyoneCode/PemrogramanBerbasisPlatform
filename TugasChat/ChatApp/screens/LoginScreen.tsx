@@ -12,6 +12,7 @@ import { signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from "../firebase";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../App";
+import { saveLoginCredentials } from "../utils/storage";
 
 type Props = NativeStackScreenProps<RootStackParamList, "Login">;
 
@@ -19,6 +20,7 @@ const LoginScreen = ({ navigation }: Props) => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -29,6 +31,12 @@ const LoginScreen = ({ navigation }: Props) => {
     setLoading(true);
     try {
       await signInWithEmailAndPassword(auth, email, password);
+
+      // Simpan kredensial jika remember me dicentang
+      if (rememberMe) {
+        saveLoginCredentials(email, password);
+      }
+
       // Navigation akan otomatis ke ChatScreen karena onAuthStateChanged
     } catch (error: any) {
       let errorMessage = "Email atau password salah";
@@ -67,6 +75,16 @@ const LoginScreen = ({ navigation }: Props) => {
       />
 
       <TouchableOpacity
+        style={styles.checkboxContainer}
+        onPress={() => setRememberMe(!rememberMe)}
+      >
+        <View style={[styles.checkbox, rememberMe && styles.checkboxChecked]}>
+          {rememberMe && <Text style={styles.checkmark}>✓</Text>}
+        </View>
+        <Text style={styles.checkboxLabel}>Ingat Saya</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
         style={styles.button}
         onPress={handleLogin}
         disabled={loading}
@@ -79,9 +97,7 @@ const LoginScreen = ({ navigation }: Props) => {
       </TouchableOpacity>
 
       <TouchableOpacity onPress={() => navigation.navigate("Register")}>
-        <Text style={styles.linkText}>
-          Belum punya akun? Daftar di sini
-        </Text>
+        <Text style={styles.linkText}>Belum punya akun? Daftar di sini</Text>
       </TouchableOpacity>
     </View>
   );
@@ -108,6 +124,33 @@ const styles = StyleSheet.create({
     padding: 15,
     marginBottom: 15,
     fontSize: 16,
+  },
+  checkboxContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderWidth: 2,
+    borderColor: "#007AFF",
+    borderRadius: 4,
+    marginRight: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  checkboxChecked: {
+    backgroundColor: "#007AFF",
+  },
+  checkmark: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+  checkboxLabel: {
+    fontSize: 16,
+    color: "#333",
   },
   button: {
     backgroundColor: "#007AFF",

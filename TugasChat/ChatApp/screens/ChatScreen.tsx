@@ -1,102 +1,108 @@
-import React, { useEffect, useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
-    View,
-    Text,
-    TextInput,
-    Button,
-    FlatList,
-    StyleSheet,
-    Alert,
-    TouchableOpacity,
-    SafeAreaView,
+  View,
+  Text,
+  TextInput,
+  Button,
+  FlatList,
+  StyleSheet,
+  SafeAreaView,
+  TouchableOpacity,
+  Alert,
 } from "react-native";
 import {
-    addDoc,
-    serverTimestamp,
-    query,
-    orderBy,
-    onSnapshot,
-} from "../firebase";
-import { messagesCollection } from "../firebase";
+  collection,
+  addDoc,
+  onSnapshot,
+  query,
+  orderBy,
+  serverTimestamp,
+} from "firebase/firestore";
+import { db, auth } from "../firebase";
+import { signOut } from "firebase/auth";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../App";
-import { signOut } from "firebase/auth";
-import { auth } from "../firebase";
+import { saveChatHistory, loadChatHistory } from "../utils/chatStorage";
 
 type MessageType = {
-    id: string;
-    text: string;
-    user: string;
-    createdAt: { seconds: number; nanoseconds: number } | null;
+  id: string;
+  text: string;
+  user: string;
+  createdAt: { seconds: number; nanoseconds: number } | null;
 };
-type Props = NativeStackScreenProps<RootStackParamList,
-"Chat">;
+
+type Props = NativeStackScreenProps<RootStackParamList, "Chat">;
+
 const ChatScreen = ({ route }: Props) => {
   const { name } = route.params;
-    const [message, setMessage] = useState<string>("");
-    const [messages, setMessages] = useState<MessageType[]>([]);
+  const [message, setMessage] = useState("");
+  const [messages, setMessages] = useState<MessageType[]>([]);
 
-
-useEffect(() => {
-    const q = query(messagesCollection, orderBy("createdAt", "asc"));
-    const unsub = onSnapshot(q, (snapshot) => {
-    const list: MessageType[] = [];
-    snapshot.forEach((doc) => {
-        list.push({
-        id: doc.id,
-    ...(doc.data() as Omit<MessageType, "id">),
-    });
-    });
-    setMessages(list);
-    });
-    return () => unsub();
-    }, []);
-    const sendMessage = async () => {
-    if (!message.trim()) return;
-    await addDoc(messagesCollection, {
-    text: message,
-    user: name,
-    createdAt: serverTimestamp(),
-    });
-    setMessage("");
+  useEffect(() => {
+    // Load chat history dari local storage saat mount
+    const loadOfflineMessages = async () => {
+      const offlineMessages = await loadChatHistory();
+      if (offlineMessages.length > 0) {
+        setMessages(offlineMessages);
+      }
     };
-    const renderItem = ({ item }: { item: MessageType }) => (
-    <View
-    style={[
-    styles.msgBox,
-    item.user === name ? styles.myMsg : styles.otherMsg,
-    ]}
-    >
-    <Text style={styles.sender}>{item.user}</Text>
-    <Text>{item.text}</Text>
-    </View>
-    );
 
-  const handleLogout = () => {
-    Alert.alert(
-      "Logout",
-      "Apakah Anda yakin ingin keluar?",
-      [
-        {
-          text: "Batal",
-          style: "cancel",
-        },
-        {
-          text: "Keluar",
-          onPress: async () => {
-            try {
-              await signOut(auth);
-            } catch (error) {
-              Alert.alert("Error", "Gagal logout");
-            }
-          },
-          style: "destructive",
-        },
-      ]
-    );
+    loadOfflineMessages();
+
+    // Subscribe ke Firestore untuk real-time updates
+    const q = query(collection(db, "messages"), orderBy("createdAt", "asc"));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const msgs: MessageType[] = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        text: doc.data().text,
+        user: doc.data().user,
+        createdAt: doc.data().createdAt,
+      }));
+      setMessages(msgs);
+      
+      // Simpan ke local storage setiap ada update
+      saveChatHistory(msgs);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  const sendMessage = async () => {
+    if (!message.trim()) return;
+
+    try {
+      await addDoc(collection(db, "messages"), {
+        text: message,
+        user: name,
+        createdAt: serverTimestamp(),
+      });
+      setMessage("");
+    } catch (error) {
+      Alert.alert("Error", "Gagal mengirim pesan");
+    }
   };
 
-    return (
+  const handleLogout = () => {
+    Alert.alert("Logout", "Apakah Anda yakin ingin keluar?", [
+      {
+        text: "Batal",
+        style: "cancel",
+      },
+      {
+        text: "Keluar",
+        onPress: async () => {
+          try {
+            await signOut(auth);
+          } catch (error) {
+            Alert.alert("Error", "Gagal logout");
+          }
+        },
+        style: "destructive",
+      },
+    ]);
+  };
+
+  return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Chat Room</Text>
@@ -105,63 +111,44 @@ useEffect(() => {
           <Text style={styles.logoutText}>Logout</Text>
         </TouchableOpacity>
       </View>
-      
+
       <FlatList
-    data={messages}
-    keyExtractor={(item) => item.id}
-    renderItem={renderItem}
-    contentContainerStyle={{ padding: 10 }}
-    />
-    <View style={styles.inputRow}>
-    <TextInput
-    style={styles.input}
-    placeholder="Ketik pesan..."
-    value={message}
-    onChangeText={setMessage}
-    />
-    <Button title="Kirim" onPress={sendMessage} />
-    </View>
+        data={messages}
+        keyExtractor={(item) => item.id}
+        renderItem={({ item }) => (
+          <View
+            style={[
+              styles.msgBox,
+              item.user === name ? styles.myMsg : styles.otherMsg,
+            ]}
+          >
+            {item.user !== name && (
+              <Text style={styles.sender}>{item.user}</Text>
+            )}
+            <Text>{item.text}</Text>
+          </View>
+        )}
+      />
+
+      <View style={styles.inputRow}>
+        <TextInput
+          style={styles.input}
+          value={message}
+          onChangeText={setMessage}
+          placeholder="Type message..."
+        />
+        <Button title="Send" onPress={sendMessage} />
+      </View>
     </SafeAreaView>
-    );
-}
+  );
+};
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: "#fff",
-    },
-    msgBox: {
-    padding: 10,
-    marginVertical: 6,
-    borderRadius: 6,
-    maxWidth: "80%",},
-    myMsg: {
-    backgroundColor: "#d1f0ff",
-    alignSelf: "flex-end",
-    },
-    otherMsg: {
-    backgroundColor: "#eee",
-    alignSelf: "flex-start",
-    },
-    sender: {
-    fontWeight: "bold",
-    marginBottom: 2,
-    fontSize: 12,
-    },
-    inputRow: {
-    flexDirection: "row",
-    padding: 10,
-    borderTopWidth: 1,
-    borderColor: "#ccc",
-    },
-    input: {
+  container: {
     flex: 1,
-    borderWidth: 1,
-    marginRight: 10,
-    padding: 8,
-    borderRadius: 6,
-    },
-    header: {
+    backgroundColor: "#fff",
+  },
+  header: {
     padding: 15,
     backgroundColor: "#007AFF",
     borderBottomWidth: 1,
@@ -189,6 +176,38 @@ const styles = StyleSheet.create({
   logoutText: {
     color: "#007AFF",
     fontWeight: "600",
+  },
+  msgBox: {
+    padding: 10,
+    marginVertical: 6,
+    borderRadius: 6,
+    maxWidth: "80%",
+  },
+  myMsg: {
+    backgroundColor: "#d1f0ff",
+    alignSelf: "flex-end",
+  },
+  otherMsg: {
+    backgroundColor: "#eee",
+    alignSelf: "flex-start",
+  },
+  sender: {
+    fontWeight: "bold",
+    marginBottom: 2,
+    fontSize: 12,
+  },
+  inputRow: {
+    flexDirection: "row",
+    padding: 10,
+    borderTopWidth: 1,
+    borderColor: "#ccc",
+  },
+  input: {
+    flex: 1,
+    borderWidth: 1,
+    marginRight: 10,
+    padding: 8,
+    borderRadius: 6,
   },
 });
 
